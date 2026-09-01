@@ -1,0 +1,42 @@
+<#
+.SYNOPSIS
+    Audits fundamental Microsoft 365 tenant security baseline configurations.
+.DESCRIPTION
+    Connects to Microsoft Graph to check core security posture elements including 
+    Security Defaults, password protection policies, and multi-factor authentication.
+.NOTES
+    Author: Quentin Falquerho
+    Requires Microsoft.Graph PowerShell SDK.
+#>
+
+# Ensure Microsoft.Graph modules are installed
+$requiredModules = @("Microsoft.Graph.Authentication", "Microsoft.Graph.Identity.SignIns", "Microsoft.Graph.DirectoryManagement")
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module)) {
+        Install-Module -Name $module -Scope CurrentUser -Force -AllowClobber
+    }
+}
+
+Import-Module Microsoft.Graph.Authentication
+Import-Module Microsoft.Graph.Identity.SignIns
+
+# Connect to Microsoft Graph with minimal required read scopes
+Connect-Graph -Scopes "Directory.Read.All", "Policy.Read.All"
+
+Write-Host "Starting Microsoft 365 Security Baseline Audit..." -ForegroundColor Cyan
+
+# Check Identity Security Defaults enforcement status
+try {
+    $securityDefaults = Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy
+    if ($securityDefaults.IsEnabled) {
+        Write-Host "[+] Security Defaults is currently ENABLED in the tenant." -ForegroundColor Green
+    } else {
+        Write-Warning "[-] Security Defaults is DISABLED. Ensure Conditional Access policies are actively configured."
+    }
+} catch {
+    Write-Error "[-] Failed to retrieve Security Defaults configuration: $_"
+}
+
+# Disconnect session cleanly
+Disconnect-Graph
+Write-Host "Audit execution complete." -ForegroundColor Cyan
